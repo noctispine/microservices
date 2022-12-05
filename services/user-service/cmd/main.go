@@ -39,5 +39,8 @@ func main() {
 	r.DELETE("/by-email", userHandler.DeleteByEmail)
 	r.DELETE("/:id", userHandler.DeleteById)
 
+	defer db.Close()
+	defer rdb.Close()
 	log.Fatal(r.Run(":" + os.Getenv("DEV_PORT")))
+
 }
