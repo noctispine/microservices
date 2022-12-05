@@ -19,3 +19,6 @@ INSERT INTO users (
 ) VALUES (
     $1, $2, $3
 );
+
+-- name: DeleteByEmail :execrows
+DELETE FROM users WHERE email = $1;
