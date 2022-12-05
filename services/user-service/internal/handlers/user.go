@@ -24,7 +24,7 @@ func NewUserHandler(db *userQ.Queries) *UserHandler {
 }
 
 func (h *UserHandler) Create(c *gin.Context) {
-	var user userQ.User	
+	var user userQ.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		log.Println(err)
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -37,16 +37,16 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.db.Create(c, userQ.CreateParams{
-		Name: user.Name,
+		Name:    user.Name,
 		Surname: user.Surname,
-		Email: user.Email,
+		Email:   user.Email,
 	}); err != nil {
 
-			if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
-				responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
-				return
-			}
-		
+		if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
+			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
+			return
+		}
+
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -68,8 +68,32 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-func (h *UserHandler) Delete(c *gin.Context) {
+func (h *UserHandler) DeleteByEmail(c *gin.Context) {
+	userEmailReq := struct {
+		Email string `json:"email" db:"email" validate:"required,email"`
+	}{}
+	if err := c.ShouldBindJSON(&userEmailReq); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
 
+	if err := validate.Struct(userEmailReq); err != nil {
+		responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrNotValid("email"))
+		return
+	}
+
+	affectedRows, err := h.db.DeleteByEmail(c, userEmailReq.Email)
+	if affectedRows == 0 {
+		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("email"))
+		return
+	}
+	if err != nil {
+		fmt.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func (h *UserHandler) GetByEmail(c *gin.Context) {

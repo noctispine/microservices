@@ -31,6 +31,7 @@ func main() {
 	r.POST("/", userHandler.Create)
 	r.GET("/", userHandler.GetAll)
 	r.GET("/by-email", userHandler.GetByEmail)
+	r.DELETE("/by-email", userHandler.DeleteByEmail)
 
 	log.Fatal(r.Run(":" + os.Getenv("DEV_PORT")))
 }
