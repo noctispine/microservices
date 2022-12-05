@@ -22,3 +22,6 @@ INSERT INTO users (
 
 -- name: DeleteByEmail :execrows
 DELETE FROM users WHERE email = $1;
+
+-- name: DeleteById :execrows
+DELETE FROM users WHERE id = $1;

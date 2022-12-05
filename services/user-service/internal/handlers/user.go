@@ -10,16 +10,20 @@ import (
 	"github.com/capstone-project-bunker/backend/pkg/utils"
 	"github.com/capstone-project-bunker/backend/pkg/wrappers"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 )
 
 type UserHandler struct {
 	db *userQ.Queries
+	rdb *redis.Client
 }
 
-func NewUserHandler(db *userQ.Queries) *UserHandler {
+func NewUserHandler(db *userQ.Queries, rdb *redis.Client) *UserHandler {
 	return &UserHandler{
 		db,
+		rdb,
 	}
 }
 
@@ -30,6 +34,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+
 
 	if err := validate.Struct(user); err != nil {
 		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
@@ -82,9 +87,9 @@ func (h *UserHandler) DeleteByEmail(c *gin.Context) {
 		return
 	}
 
-	affectedRows, err := h.db.DeleteByEmail(c, userEmailReq.Email)
-	if affectedRows == 0 {
-		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("email"))
+	rowsAffected, err := h.db.DeleteByEmail(c, userEmailReq.Email)
+	if rowsAffected == 0 {
+		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("user"))
 		return
 	}
 	if err != nil {
@@ -125,4 +130,31 @@ func (h *UserHandler) GetByEmail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *UserHandler) DeleteById(c *gin.Context) {
+	idString := c.Params.ByName("id")
+	if idString == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	id, err := uuid.Parse(idString)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+
+	rowsAffected, err := h.db.DeleteById(c, id)
+	if rowsAffected == 0 {
+		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("user"))
+		return
+	}
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
