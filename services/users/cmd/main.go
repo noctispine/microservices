@@ -33,7 +33,7 @@ func init() {
 
 func main() {
 	r := gin.Default()
-	r.POST("/", userHandler.Create)
+	r.POST("/", userHandler.Register)
 	r.GET("/", userHandler.GetAll)
 	r.GET("/by-email", userHandler.GetByEmail)
 	r.DELETE("/by-email", userHandler.DeleteByEmail)

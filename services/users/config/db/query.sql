@@ -15,9 +15,9 @@ WHERE id = $1;
 
 -- name: Create :exec
 INSERT INTO users (
-    name, surname, email
+    email, hashed_password, name, surname
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4
 );
 
 -- name: DeleteByEmail :execrows

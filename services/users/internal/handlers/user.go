@@ -27,38 +27,6 @@ func NewUserHandler(db *userQ.Queries, rdb *redis.Client) *UserHandler {
 	}
 }
 
-func (h *UserHandler) Create(c *gin.Context) {
-	var user userQ.User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		log.Println(err)
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-
-	if err := validate.Struct(user); err != nil {
-		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
-		return
-	}
-
-	if err := h.db.Create(c, userQ.CreateParams{
-		Name:    user.Name,
-		Surname: user.Surname,
-		Email:   user.Email,
-	}); err != nil {
-
-		if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
-			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
-			return
-		}
-
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	c.Status(http.StatusCreated)
-}
-
 func (h *UserHandler) GetAll(c *gin.Context) {
 	var users []userQ.User
 	var err error
@@ -157,4 +125,51 @@ func (h *UserHandler) DeleteById(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *UserHandler) Register(c *gin.Context) {
+	user := struct {
+		Email string `json:"email" validate:"required,email"`
+		Password string `json:"password" validate:"required,min=6,max=64"`
+		Name string `json:"name" validate:"required,max=50"`
+		Surname string `json:"surname" validate:"required,max=50"`
+	}{}
+
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		// log.Error(err)
+		return
+	}
+
+
+	if err := validate.Struct(user); err != nil {
+		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
+		return
+	}
+
+	hashedPassword, err := utils.HashPassword(user.Password)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		// log.Error(err.Error())
+		return
+	}
+
+	newUser := userQ.CreateParams{
+		Email: user.Email,
+		HashedPassword: hashedPassword,
+		Name: user.Name,
+		Surname: user.Surname,
+	}
+
+	if err := h.db.Create(c, newUser); err != nil {
+		if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
+			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
+			return
+		}
+		
+		c.AbortWithStatus(http.StatusBadRequest)
+		// log.Error(fmt.Errorf("while registering: %w", err))
+		return
+	}
+	c.Status(http.StatusCreated)
 }
