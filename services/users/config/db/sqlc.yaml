@@ -1,0 +1,21 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "query.sql"
+    schema: "schema.sql"
+    gen:
+      go:
+        package: "userQ"
+        json_tags_case_style: "camel"
+        emit_json_tags: true
+        emit_db_tags: true
+        overrides: 
+          - column: users.id
+            go_struct_tag: validate:"omitempty"
+          - column: users.name
+            go_struct_tag: validate:"required,max=50"
+          - column: users.surname
+            go_struct_tag: validate:"required,max=50"
+          - column: users.email
+            go_struct_tag: validate:"required,email"
+        out: "../../cmd/db/queries/user"
