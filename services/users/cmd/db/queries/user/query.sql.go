@@ -13,20 +13,26 @@ import (
 
 const create = `-- name: Create :exec
 INSERT INTO users (
-    name, surname, email
+    email, hashed_password, name, surname
 ) VALUES (
-    $1, $2, $3
+    $1, $2, $3, $4
 )
 `
 
 type CreateParams struct {
-	Name    string `db:"name" json:"name"`
-	Surname string `db:"surname" json:"surname"`
-	Email   string `db:"email" json:"email"`
+	Email          string `db:"email" json:"email"`
+	HashedPassword string `db:"hashed_password" json:"hashedPassword"`
+	Name           string `db:"name" json:"name"`
+	Surname        string `db:"surname" json:"surname"`
 }
 
 func (q *Queries) Create(ctx context.Context, arg CreateParams) error {
-	_, err := q.db.ExecContext(ctx, create, arg.Name, arg.Surname, arg.Email)
+	_, err := q.db.ExecContext(ctx, create,
+		arg.Email,
+		arg.HashedPassword,
+		arg.Name,
+		arg.Surname,
+	)
 	return err
 }
 
@@ -55,7 +61,7 @@ func (q *Queries) DeleteById(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getAll = `-- name: GetAll :many
-SELECT id, name, surname, email FROM users
+SELECT id, email, hashed_password, name, surname, role, created_at, last_login_at FROM users
 `
 
 func (q *Queries) GetAll(ctx context.Context) ([]User, error) {
@@ -69,9 +75,13 @@ func (q *Queries) GetAll(ctx context.Context) ([]User, error) {
 		var i User
 		if err := rows.Scan(
 			&i.ID,
+			&i.Email,
+			&i.HashedPassword,
 			&i.Name,
 			&i.Surname,
-			&i.Email,
+			&i.Role,
+			&i.CreatedAt,
+			&i.LastLoginAt,
 		); err != nil {
 			return nil, err
 		}
@@ -87,7 +97,7 @@ func (q *Queries) GetAll(ctx context.Context) ([]User, error) {
 }
 
 const getAllByNames = `-- name: GetAllByNames :many
-SELECT id, name, surname, email FROM users
+SELECT id, email, hashed_password, name, surname, role, created_at, last_login_at FROM users
 ORDER BY name
 `
 
@@ -102,9 +112,13 @@ func (q *Queries) GetAllByNames(ctx context.Context) ([]User, error) {
 		var i User
 		if err := rows.Scan(
 			&i.ID,
+			&i.Email,
+			&i.HashedPassword,
 			&i.Name,
 			&i.Surname,
-			&i.Email,
+			&i.Role,
+			&i.CreatedAt,
+			&i.LastLoginAt,
 		); err != nil {
 			return nil, err
 		}
@@ -120,7 +134,7 @@ func (q *Queries) GetAllByNames(ctx context.Context) ([]User, error) {
 }
 
 const getByEmail = `-- name: GetByEmail :one
-SELECT id, name, surname, email FROM users
+SELECT id, email, hashed_password, name, surname, role, created_at, last_login_at FROM users
 WHERE email = $1
 `
 
@@ -129,15 +143,19 @@ func (q *Queries) GetByEmail(ctx context.Context, email string) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.Email,
+		&i.HashedPassword,
 		&i.Name,
 		&i.Surname,
-		&i.Email,
+		&i.Role,
+		&i.CreatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
 
 const getById = `-- name: GetById :one
-SELECT id, name, surname, email FROM users
+SELECT id, email, hashed_password, name, surname, role, created_at, last_login_at FROM users
 WHERE id = $1
 `
 
@@ -146,9 +164,13 @@ func (q *Queries) GetById(ctx context.Context, id uuid.UUID) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
+		&i.Email,
+		&i.HashedPassword,
 		&i.Name,
 		&i.Surname,
-		&i.Email,
+		&i.Role,
+		&i.CreatedAt,
+		&i.LastLoginAt,
 	)
 	return i, err
 }
