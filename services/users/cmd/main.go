@@ -27,7 +27,7 @@ func init() {
 	db = dbPackage.GetDatabase()
 	queriesDB := userQ.New(db)
 	rdb = cache.NewRedisClient()
-	
+
 	userHandler = handlers.NewUserHandler(queriesDB, rdb)
 }
 
@@ -38,6 +38,7 @@ func main() {
 	r.GET("/by-email", userHandler.GetByEmail)
 	r.DELETE("/by-email", userHandler.DeleteByEmail)
 	r.DELETE("/:id", userHandler.DeleteById)
+	r.PATCH("/:id", userHandler.ActivateUser)
 
 	defer db.Close()
 	defer rdb.Close()

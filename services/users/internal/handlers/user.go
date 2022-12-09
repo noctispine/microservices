@@ -16,7 +16,7 @@ import (
 )
 
 type UserHandler struct {
-	db *userQ.Queries
+	db  *userQ.Queries
 	rdb *redis.Client
 }
 
@@ -113,7 +113,6 @@ func (h *UserHandler) DeleteById(c *gin.Context) {
 		return
 	}
 
-
 	rowsAffected, err := h.db.DeleteById(c, id)
 	if rowsAffected == 0 {
 		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("user"))
@@ -129,10 +128,10 @@ func (h *UserHandler) DeleteById(c *gin.Context) {
 
 func (h *UserHandler) Register(c *gin.Context) {
 	user := struct {
-		Email string `json:"email" validate:"required,email"`
+		Email    string `json:"email" validate:"required,email"`
 		Password string `json:"password" validate:"required,min=6,max=64"`
-		Name string `json:"name" validate:"required,max=50"`
-		Surname string `json:"surname" validate:"required,max=50"`
+		Name     string `json:"name" validate:"required,max=50"`
+		Surname  string `json:"surname" validate:"required,max=50"`
 	}{}
 
 	if err := c.ShouldBindJSON(&user); err != nil {
@@ -140,7 +139,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 		// log.Error(err)
 		return
 	}
-
 
 	if err := validate.Struct(user); err != nil {
 		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
@@ -155,10 +153,10 @@ func (h *UserHandler) Register(c *gin.Context) {
 	}
 
 	newUser := userQ.CreateParams{
-		Email: user.Email,
+		Email:          user.Email,
 		HashedPassword: hashedPassword,
-		Name: user.Name,
-		Surname: user.Surname,
+		Name:           user.Name,
+		Surname:        user.Surname,
 	}
 
 	if err := h.db.Create(c, newUser); err != nil {
@@ -166,10 +164,33 @@ func (h *UserHandler) Register(c *gin.Context) {
 			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
 			return
 		}
-		
+
 		c.AbortWithStatus(http.StatusBadRequest)
 		// log.Error(fmt.Errorf("while registering: %w", err))
 		return
 	}
 	c.Status(http.StatusCreated)
+}
+
+func (h *UserHandler) ActivateUser(c *gin.Context) {
+	idString := c.Params.ByName("id")
+	if idString == "" {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	id, err := uuid.Parse(idString)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	rowsAffected, err := h.db.ActivateUser(c, id)
+	if rowsAffected == 0 {
+		responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrNotFound("user"))
+		return
+	}
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
 }
