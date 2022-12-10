@@ -1,13 +1,16 @@
 package handlers
 
 import (
-	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
+	userDB "github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
+	"github.com/capstone-project-bunker/backend/services/auth/internal/validatorTranslations"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/responses"
 	"github.com/capstone-project-bunker/backend/services/auth/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -22,8 +25,13 @@ type Claims struct {
 }
 
 type AuthHandler struct {
-	ctx context.Context
-	db *users.Queries
+	db *userDB.Queries
+}
+
+func NewAuthHandler(db *userDB.Queries) *AuthHandler {
+	return &AuthHandler{
+		db: db,
+	}
 }
 
 
@@ -39,21 +47,17 @@ func (h *AuthHandler) SignInHandler(c *gin.Context) {
 		return
 	}
 	
-	// if err := validate.Struct(user); err != nil {
-	// 	responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
-	// 	return
-	// }
+	if err := validatorTranslations.Validate.Struct(user); err != nil {
+		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
+		return
+	}
 
 	dbUser, err := h.db.GetByEmail(c, user.Email)
 	if err != nil {
 		// notfound implementation
-
-
-
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-
 
 	// if !dbUser.IsActive {
 	// 	responses.AbortWithStatusJSONError(c, http.StatusBadRequest, fmt.Errorf("user is not activated yet, you can contact via email on home page"))
@@ -88,24 +92,24 @@ func (h *AuthHandler) SignInHandler(c *gin.Context) {
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
-		// log.Error(fmt.Errorf("jwt signed string: %w", err))
+		log.Print(fmt.Errorf("jwt signed string: %w", err))
 		return
 	}
 
-	// dbUser.LastLoginAt = time.Now()
-	// if err := h.db.Save(&dbUser).Error; err != nil {
-	// 	c.AbortWithStatus(http.StatusInternalServerError)
-	// 	// log.Error(err.Error())
-	// 	return
-	// }
+	if err := h.db.UpdateLastLoginAt(c, dbUser.ID, time.Now()); err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		log.Print(fmt.Errorf("db update error: %w", err))
+
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user": users.User{
+		"user": userDB.User{
 			ID: dbUser.ID,
 			Email: dbUser.Email,
 			Role: dbUser.Role,
 			Name: dbUser.Name,
-
+			Surname: dbUser.Surname,
 		},
 		"token": tokenString})
 }
