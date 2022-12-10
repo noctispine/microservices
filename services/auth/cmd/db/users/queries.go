@@ -1,8 +1,11 @@
-package users
+package userDB
 
 import (
 	"context"
 	"database/sql"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type LoginParams struct {
@@ -44,4 +47,14 @@ func (q *Queries) GetByEmail(ctx context.Context, email string) (User, error) {
 		&i.LastLoginAt,
 	)
 	return i, err
+}
+
+const updateLoginAt = `-- name: updateLoginAt :one
+UPDATE users
+SET last_login_at = $2
+WHERE id = $1
+`
+
+func (q *Queries) UpdateLastLoginAt(ctx context.Context, id uuid.UUID, lastLoginAt time.Time) error {
+	return q.db.QueryRowContext(ctx, updateLoginAt, id, lastLoginAt).Err()
 }
