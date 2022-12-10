@@ -25,3 +25,6 @@ DELETE FROM users WHERE email = $1;
 
 -- name: DeleteById :execrows
 DELETE FROM users WHERE id = $1;
+
+-- name: ActivateUser :execrows
+UPDATE users SET is_active = TRUE WHERE ID = $1;
