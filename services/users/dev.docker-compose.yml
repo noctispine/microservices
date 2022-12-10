@@ -1,14 +1,12 @@
 version: "3.8"
 services:
-  db:
+  users_db:
     image: postgres:15.1-alpine
-    container_name: users-db
+    container_name: users_db
     restart: always
     volumes:
       - ./data/db:/var/lib/postgresql/data
       - ./config/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-    ports:
-      - "5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -16,12 +14,10 @@ services:
     networks:
       - users_network
 
-  redis-cache:
+  redis_cache:
     image: redis:7.0.5-alpine
-    container_name: users-cache
+    container_name: redis_cache
     restart: always
-    ports:
-      - "6379:6379"
     volumes:
       - ./data/cache:/data
     networks:
@@ -29,6 +25,9 @@ services:
 
   users_service:
     container_name: users_go
+    depends_on:
+      - redis_cache
+      - users_db
     restart: always
     build:
       dockerfile: dev.Dockerfile
@@ -36,6 +35,8 @@ services:
       - 8080:8080
     volumes:
       - ./:/app
+    networks:
+      - users_network
 
 networks:
   users_network:
