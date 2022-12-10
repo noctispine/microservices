@@ -22,4 +22,6 @@ sql:
             go_struct_tag: validate:"required,email"
           - column: users.role
             go_struct_tag: validate:"required"
+          - column: users.is_active
+            go_struct_tag: validate:"omitempty"
         out: "../../cmd/db/queries/user"

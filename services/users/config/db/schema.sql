@@ -6,5 +6,6 @@ CREATE TABLE IF NOT EXISTS users (
     surname VARCHAR(50) NOT NULL,
     role INT NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
-    last_login_at TIMESTAMP 
+    last_login_at TIMESTAMP,
+    is_active boolean NOT NULL DEFAULT FALSE
 );
