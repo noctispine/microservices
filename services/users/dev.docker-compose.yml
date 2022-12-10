@@ -12,7 +12,10 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB} 
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - users_network
+
   redis-cache:
     image: redis:7.0.5-alpine
     container_name: users-cache
@@ -21,6 +24,22 @@ services:
       - "6379:6379"
     volumes:
       - ./data/cache:/data
+    networks:
+      - users_network
+
+  users_service:
+    container_name: users_go
+    restart: always
+    build:
+      dockerfile: dev.Dockerfile
+    ports:
+      - 8080:8080
+    volumes:
+      - ./:/app
+
+networks:
+  users_network:
+    name: users_network
     
 volumes:
   data:
