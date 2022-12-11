@@ -9,6 +9,7 @@ import (
 	dbPackage "github.com/capstone-project-bunker/backend/services/users/cmd/db"
 	userQ "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
 	"github.com/capstone-project-bunker/backend/services/users/internal/handlers"
+	"github.com/capstone-project-bunker/backend/services/users/pkg/constants/envKeys"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
@@ -19,7 +20,14 @@ var userHandler *handlers.UserHandler
 var rdb *redis.Client
 
 func init() {
-	err := godotenv.Load(".env")
+	var err error
+	
+	if os.Getenv(envKeys.APP_ENV) == envKeys.PRODUCTION {
+		err = godotenv.Load("prod.env")
+	} else {
+		err = godotenv.Load("dev.env")
+	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
