@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,19 +11,14 @@ import (
 
 	userDB "github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
 	"github.com/capstone-project-bunker/backend/services/auth/internal/validatorTranslations"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/constants/keys"
 	"github.com/capstone-project-bunker/backend/services/auth/pkg/responses"
 	"github.com/capstone-project-bunker/backend/services/auth/pkg/utils"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/wrappers"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 )
-
-type Claims struct {
-	Email string `json:"email"`
-	UserID uuid.UUID 
-	jwt.RegisteredClaims
-	Role int32
-}
 
 type AuthHandler struct {
 	db *userDB.Queries
@@ -33,10 +29,14 @@ func NewAuthHandler(db *userDB.Queries) *AuthHandler {
 		db: db,
 	}
 }
+type Claims struct {
+	Email string `json:"email"`
+	UserID uuid.UUID 
+	jwt.RegisteredClaims
+	Role int32
+}
 
-
-
-func (h *AuthHandler) SignInHandler(c *gin.Context) {
+func (h *AuthHandler) Login(c *gin.Context) {
 	user := struct {
 		Email string `json:"email" validate:"required,email"`
 		Password string `json:"password" validate:"required,min=6,max=64"`
@@ -54,7 +54,11 @@ func (h *AuthHandler) SignInHandler(c *gin.Context) {
 
 	dbUser, err := h.db.GetByEmail(c, user.Email)
 	if err != nil {
-		// notfound implementation
+		if err.Error() == sql.ErrNoRows.Error() {
+			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrDoesNotExist("user"))
+			return
+		}
+
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -112,4 +116,30 @@ func (h *AuthHandler) SignInHandler(c *gin.Context) {
 			Surname: dbUser.Surname,
 		},
 		"token": tokenString})
+}
+
+func (h *AuthHandler) Validate(c *gin.Context) {
+	tokenValue := c.GetHeader("Authorization")
+	claims := &Claims{}
+	
+	tkn, err := jwt.ParseWithClaims(tokenValue, claims, func(token *jwt.Token) (interface{}, error){
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	if tkn == nil || !tkn.Valid {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	c.Set(keys.UserID, claims.UserID)
+	c.Set(keys.UserRole, claims.Role)
+	c.JSON(http.StatusOK, gin.H{
+		"userID": claims.UserID,
+		"userRole": claims.Role,
+	})
 }
