@@ -18,7 +18,7 @@ if [ $1 == "down" ]; then
     for ((i=${#serviceDirs[@]} -1; i>=0; i--)); do
         docker compose -f ./${serviceDirs[i]}/dev.docker-compose.yml down
     done
-    echo "\n---------\nCONTAINERS HAVE BEEN STOPPED AND REMOVED\n---------"
+    echo "\n---------\nCONTAINERS HAVE BEEN STOPPED THEN REMOVED\n---------"
     exit 0
 fi
 
