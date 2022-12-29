@@ -1,14 +1,14 @@
-serviceDirs=("users" "auth")
+serviceDirs=("users" "auth" "gateway")
+envFileName="dev.env"
 
-if [ $# -ne 1 ]
-  then
+if [ $# -ne 1 ]; then
     echo "Write 'up' or 'down' as argument"
     exit 1
 fi
 
 if [ $1 == "up" ]; then
     for serviceDir in ${serviceDirs[@]}; do
-        docker compose -f ./${serviceDir}/dev.docker-compose.yml up -d
+        docker compose --env-file ./${serviceDir}/${envFileName} -f ./${serviceDir}/dev.docker-compose.yml up -d
     done
     echo "\n---------\nCONTAINERS ARE READY\n---------"
     exit 0
