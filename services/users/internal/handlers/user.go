@@ -1,196 +1,202 @@
 package handlers
 
 import (
-	"fmt"
-	"log"
+	"context"
 	"net/http"
 
-	userQ "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
-	"github.com/capstone-project-bunker/backend/services/users/pkg/responses"
+	userDB "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
+	"github.com/capstone-project-bunker/backend/services/users/pkg/pb"
 	"github.com/capstone-project-bunker/backend/services/users/pkg/utils"
 	"github.com/capstone-project-bunker/backend/services/users/pkg/wrappers"
-	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type UserHandler struct {
-	db  *userQ.Queries
+type UserService struct {
+	db  *userDB.Queries
 	rdb *redis.Client
 }
 
-func NewUserHandler(db *userQ.Queries, rdb *redis.Client) *UserHandler {
-	return &UserHandler{
+func NewUserService(db *userDB.Queries, rdb *redis.Client) *UserService {
+	return &UserService{
 		db,
 		rdb,
 	}
 }
 
-func (h *UserHandler) GetAll(c *gin.Context) {
-	var users []userQ.User
+func (h *UserService) GetAll(c context.Context, req *pb.GetAllRequest) (*pb.GetAllResponse, error){
+	var dbUsers []userDB.User
 	var err error
 
-	users, err = h.db.GetAll(c)
+	dbUsers, err = h.db.GetAll(c)
 	if err != nil {
-		log.Println(err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	c.JSON(http.StatusOK, users)
+	var res pb.GetAllResponse
+
+	for _, user := range dbUsers {
+		res.Users = append(res.Users, &pb.User{Id: user.ID.String(),
+			Email: user.Email,
+			Name: user.Name,
+			Surname: user.Surname,
+			Role: pb.ROLES(user.Role),
+			CreatedAt: timestamppb.New(user.CreatedAt),
+			LastLoginAt: timestamppb.New(user.LastLoginAt.Time),
+			IsActive: user.IsActive,})
+	}
+
+	res.BaseResponse = &pb.Response{
+		Status: http.StatusOK,
+	}
+
+	return &res, nil
 }
 
-func (h *UserHandler) DeleteByEmail(c *gin.Context) {
-	userEmailReq := struct {
-		Email string `json:"email" db:"email" validate:"required,email"`
-	}{}
-	if err := c.ShouldBindJSON(&userEmailReq); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	if err := validate.Struct(userEmailReq); err != nil {
-		responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrNotValid("email"))
-		return
-	}
-
-	rowsAffected, err := h.db.DeleteByEmail(c, userEmailReq.Email)
-	if rowsAffected == 0 {
-		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("user"))
-		return
-	}
+func (h *UserService) GetById(c context.Context, req *pb.GetByIdRequest) (*pb.GetByIdResponse, error) {
+	id, err := uuid.Parse(req.Id)
 	if err != nil {
-		fmt.Println(err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return &pb.GetByIdResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusBadRequest,
+				Error: wrappers.NewErrNotValid("user id").Error(),
+			},
+		}, nil
 	}
 
-	c.Status(http.StatusNoContent)
+	user, err := h.db.GetById(c, id)
+
+	if err != nil {
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+
+	return &pb.GetByIdResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusOK,
+		},
+		User: &pb.User{
+			Id: user.ID.String(),
+			Email: user.Email,
+			Name: user.Name,
+			Surname: user.Surname,
+			Role: pb.ROLES(user.Role),
+			CreatedAt: timestamppb.New(user.CreatedAt),
+			LastLoginAt: timestamppb.New(user.LastLoginAt.Time),
+			IsActive: user.IsActive,
+		},
+	}, nil
 }
 
-func (h *UserHandler) GetByEmail(c *gin.Context) {
-	userEmailReq := struct {
-		Email string `json:"email" db:"email" validate:"required,email"`
-	}{}
+func (h *UserService) DeleteById(c context.Context, req *pb.DeleteByIdRequest) (*pb.DeleteByIdResponse, error) {
+	// idString := c.Params.ByName("id")
+	// if idString == "" {
+	// 	c.AbortWithStatus(http.StatusBadRequest)
+	// 	return
+	// }
 
-	if err := c.ShouldBindJSON(&userEmailReq); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	if err := validate.Struct(userEmailReq); err != nil {
-		responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrNotValid("email"))
-		return
-	}
-
-	fmt.Println(userEmailReq)
-
-	user, err := h.db.GetByEmail(c, userEmailReq.Email)
+	id, err := uuid.Parse(req.Id)
 	if err != nil {
-		if utils.CheckPostgreError(err, pgerrcode.NoDataFound) {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
-func (h *UserHandler) DeleteById(c *gin.Context) {
-	idString := c.Params.ByName("id")
-	if idString == "" {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	id, err := uuid.Parse(idString)
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
+		return &pb.DeleteByIdResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusBadRequest,
+				Error: wrappers.NewErrNotValid("user id").Error(),
+			},
+		}, nil
 	}
 
 	rowsAffected, err := h.db.DeleteById(c, id)
 	if rowsAffected == 0 {
-		responses.AbortWithStatusJSONError(c, http.StatusNotFound, wrappers.NewErrNotFound("user"))
-		return
+		return &pb.DeleteByIdResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusNotFound,
+				Error: wrappers.NewErrNotFound("user").Error(),
+			},
+		}, status.Error(codes.NotFound, err.Error())
 	}
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 
-	c.Status(http.StatusNoContent)
+	return &pb.DeleteByIdResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusNoContent,
+		},
+	}, nil
 }
 
-func (h *UserHandler) Register(c *gin.Context) {
-	user := struct {
-		Email    string `json:"email" validate:"required,email"`
-		Password string `json:"password" validate:"required,min=6,max=64"`
-		Name     string `json:"name" validate:"required,max=50"`
-		Surname  string `json:"surname" validate:"required,max=50"`
-	}{}
-
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		// log.Error(err)
-		return
-	}
-
-	if err := validate.Struct(user); err != nil {
-		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
-		return
-	}
-
-	hashedPassword, err := utils.HashPassword(user.Password)
+func (h *UserService) Register(c context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error){
+	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		// log.Error(err.Error())
-		return
+		return nil, status.Error(codes.Unknown, err.Error()) 
 	}
 
-	newUser := userQ.CreateParams{
-		Email:          user.Email,
+	createUserParams := userDB.CreateParams{
+		Email: req.Email,
 		HashedPassword: hashedPassword,
-		Name:           user.Name,
-		Surname:        user.Surname,
+		Name: req.Name,
+		Surname: req.Surname,
 	}
 
-	if err := h.db.Create(c, newUser); err != nil {
+	if err := h.db.Create(c, createUserParams); err != nil {
 		if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
-			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrAlreadyExists("email"))
-			return
+			return &pb.RegisterResponse{
+				BaseResponse: &pb.Response{
+					Status: http.StatusBadRequest,
+					Error: wrappers.NewErrAlreadyExists("user").Error(),
+				},
+			}, nil
 		}
 
-		c.AbortWithStatus(http.StatusBadRequest)
-		// log.Error(fmt.Errorf("while registering: %w", err))
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	c.Status(http.StatusCreated)
-}
+	
+	return &pb.RegisterResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusOK,
+		},
+	}, nil
+} 
 
-func (h *UserHandler) ActivateUser(c *gin.Context) {
-	idString := c.Params.ByName("id")
-	if idString == "" {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	id, err := uuid.Parse(idString)
+func (h *UserService) ActivateUser(c context.Context, req *pb.ActivateUserRequest) (*pb.ActivateUserResponse, error) {
+	// idString := c.Params.ByName("id")
+	// if idString == "" {
+	// 	c.AbortWithStatus(http.StatusBadRequest)
+	// 	return
+	// }
+
+	id, err := uuid.Parse(req.Id)
+
 	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
+		return &pb.ActivateUserResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusBadRequest,
+				Error: wrappers.NewErrNotValid("user id").Error(),
+			},
+		}, nil
 	}
+
 	rowsAffected, err := h.db.ActivateUser(c, id)
+
 	if rowsAffected == 0 {
-		responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrNotFound("user"))
-		return
+		return &pb.ActivateUserResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusNotFound,
+				Error: wrappers.NewErrNotFound("user").Error(),
+			},
+		}, nil
 	}
+	
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
-	c.Status(http.StatusOK)
+	
+	return &pb.ActivateUserResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusOK,
+		},
+	}, nil
 }
