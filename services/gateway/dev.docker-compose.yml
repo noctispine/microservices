@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+    gateway:
+        container_name: gateway
+        restart: always
+        build:
+          dockerfile: dev.Dockerfile
+        ports:
+            - 3000:8082
+        volumes:
+            - ./:/app
+            
+networks:
+  default:
+    name: cp-backend 
+    external: true
