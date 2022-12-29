@@ -14,6 +14,8 @@ type User struct {
 	Name           string       `db:"name" json:"name" validate:"required,max=50"`
 	Surname        string       `db:"surname" json:"surname" validate:"required,max=50"`
 	Role           int32        `db:"role" json:"role" validate:"required"`
+	IsActive       bool         `db:"is_active" json:"isActive" validate:"omitempty"`
 	CreatedAt      time.Time    `db:"created_at" json:"createdAt"`
 	LastLoginAt    sql.NullTime `db:"last_login_at" json:"lastLoginAt"`
 }
+

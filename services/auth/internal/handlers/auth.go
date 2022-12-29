@@ -1,31 +1,31 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
-	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	userDB "github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
-	"github.com/capstone-project-bunker/backend/services/auth/internal/validatorTranslations"
-	"github.com/capstone-project-bunker/backend/services/auth/pkg/constants/keys"
-	"github.com/capstone-project-bunker/backend/services/auth/pkg/responses"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/pb"
 	"github.com/capstone-project-bunker/backend/services/auth/pkg/utils"
 	"github.com/capstone-project-bunker/backend/services/auth/pkg/wrappers"
-	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-type AuthHandler struct {
+type AuthService struct {
 	db *userDB.Queries
+	pb.UnimplementedAuthServiceServer
 }
 
-func NewAuthHandler(db *userDB.Queries) *AuthHandler {
-	return &AuthHandler{
+func NewAuthService(db *userDB.Queries) *AuthService {
+	return &AuthService{
 		db: db,
 	}
 }
@@ -36,49 +36,52 @@ type Claims struct {
 	Role int32
 }
 
-func (h *AuthHandler) Login(c *gin.Context) {
-	user := struct {
-		Email string `json:"email" validate:"required,email"`
-		Password string `json:"password" validate:"required,min=6,max=64"`
-	}{}
 
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	
-	if err := validatorTranslations.Validate.Struct(user); err != nil {
-		responses.AbortWithStatusJSONValidationErrors(c, http.StatusBadRequest, err)
-		return
-	}
+// func response(resp *pb.LoginResponse,status int64, err error) (*pb.LoginResponse, error) {
+// 	resp.BaseResponse.Error = err.Error()
+// 	resp.BaseResponse.Status = status
+// 	return resp, err
+// }
 
-	dbUser, err := h.db.GetByEmail(c, user.Email)
+
+
+func (h *AuthService) Login(c context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
+	dbUser, err := h.db.GetByEmail(c, req.Email)
 	if err != nil {
 		if err.Error() == sql.ErrNoRows.Error() {
-			responses.AbortWithStatusJSONError(c, http.StatusBadRequest, wrappers.NewErrDoesNotExist("user"))
-			return
+			return &pb.LoginResponse{
+				BaseResponse: &pb.Response{
+					Status: http.StatusBadRequest,
+					Error: wrappers.NewErrDoesNotExist("user").Error(),
+				}, 
+			}, nil
+
 		}
 
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return  nil, status.Error(codes.Unknown, err.Error())
 	}
 
 	// if !dbUser.IsActive {
-	// 	responses.AbortWithStatusJSONError(c, http.StatusBadRequest, fmt.Errorf("user is not activated yet, you can contact via email on home page"))
-	// 	return
+	// 	return &pb.LoginResponse{
+	// 		BaseResponse: &pb.Response{
+	// 			Status: http.StatusBadRequest,
+	// 			Error: fmt.Errorf("user is not activated yet").Error(),
+	// 		},
+	// 	}, status.Error(codes.FailedPrecondition, err.Error())
 	// }
 
-	if !utils.CheckPasswordHash(user.Password, dbUser.HashedPassword) {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"error": "Wrong Credentials"})
-		return
+	if !utils.CheckPasswordHash(req.Password, dbUser.HashedPassword) {
+		return &pb.LoginResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusBadRequest,
+				Error: "wrong credentials",
+			},
+		}, nil
 	}
 
 	expireInMinutes, err := strconv.Atoi(os.Getenv("JWT_EXPIRE_MINUTES"))
 	if err != nil {
-		// log.Error(fmt.Errorf("jwt conversion to int: %w", err))
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+		return nil, status.Error(codes.Unknown, err.Error())
 	}
 	
 	expirationTime := time.Now().Add(time.Duration(expireInMinutes) * time.Minute)
@@ -91,55 +94,90 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Role: dbUser.Role,
 	}
 
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		log.Print(fmt.Errorf("jwt signed string: %w", err))
-		return
+			return nil, status.Error(codes.Unknown, err.Error())
+		}
+
+		if err := h.db.UpdateLastLoginAt(c, dbUser.ID, time.Now()); err != nil {
+
+			return nil, status.Error(codes.Unknown, err.Error())
+		}
+
+		return &pb.LoginResponse{
+			Token: tokenString,
+			Id: dbUser.ID.String(),
+			Role: pb.ROLES(dbUser.Role),
+			BaseResponse: &pb.Response{
+				Status: http.StatusOK,
+			},
+		}, nil
 	}
 
-	if err := h.db.UpdateLastLoginAt(c, dbUser.ID, time.Now()); err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		log.Print(fmt.Errorf("db update error: %w", err))
-
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"user": userDB.User{
-			ID: dbUser.ID,
-			Email: dbUser.Email,
-			Role: dbUser.Role,
-			Name: dbUser.Name,
-			Surname: dbUser.Surname,
-		},
-		"token": tokenString})
-}
-
-func (h *AuthHandler) Validate(c *gin.Context) {
-	tokenValue := c.GetHeader("Authorization")
+func (h *AuthService) Validate(c context.Context, req *pb.ValidateRequest) (*pb.ValidateResponse, error){
 	claims := &Claims{}
-	
-	tkn, err := jwt.ParseWithClaims(tokenValue, claims, func(token *jwt.Token) (interface{}, error){
+
+	tkn, err := jwt.ParseWithClaims(req.Token, claims, func(token *jwt.Token) (interface{}, error){
 		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 
 	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
+		return &pb.ValidateResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusUnauthorized,
+				Error: wrappers.NewErrNotValid("token").Error(),
+			},
+		}, nil
 	}
 
 	if tkn == nil || !tkn.Valid {
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
+		return &pb.ValidateResponse{
+			BaseResponse: &pb.Response{
+				Status: http.StatusUnauthorized,
+				Error: wrappers.NewErrNotValid("token").Error(),
+			},
+		}, nil
+	}
+	
+	return &pb.ValidateResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusOK,	
+		},
+		Id: claims.ID,
+		Role: pb.ROLES(claims.Role),
+	}, nil
+} 
+
+func (h *AuthService) Register(c context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error){
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return nil, status.Error(codes.Unknown, err.Error()) 
 	}
 
-	c.Set(keys.UserID, claims.UserID)
-	c.Set(keys.UserRole, claims.Role)
-	c.JSON(http.StatusOK, gin.H{
-		"userID": claims.UserID,
-		"userRole": claims.Role,
-	})
-}
+	createUserParams := userDB.CreateParams{
+		Email: req.Email,
+		HashedPassword: hashedPassword,
+		Name: req.Name,
+		Surname: req.Surname,
+	}
+
+	if err := h.db.Create(c, createUserParams); err != nil {
+		if utils.CheckPostgreError(err, pgerrcode.UniqueViolation) {
+			return &pb.RegisterResponse{
+				BaseResponse: &pb.Response{
+					Status: http.StatusBadRequest,
+					Error: wrappers.NewErrAlreadyExists("user").Error(),
+				},
+			}, nil
+		}
+
+		return nil, status.Error(codes.Unknown, err.Error())
+	}
+	
+	return &pb.RegisterResponse{
+		BaseResponse: &pb.Response{
+			Status: http.StatusOK,
+		},
+	}, nil
+} 

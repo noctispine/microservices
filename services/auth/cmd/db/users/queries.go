@@ -58,3 +58,28 @@ WHERE id = $1
 func (q *Queries) UpdateLastLoginAt(ctx context.Context, id uuid.UUID, lastLoginAt time.Time) error {
 	return q.db.QueryRowContext(ctx, updateLoginAt, id, lastLoginAt).Err()
 }
+
+const create = `-- name: Create :exec
+INSERT INTO users (
+    email, hashed_password, name, surname
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type CreateParams struct {
+	Email          string `db:"email" json:"email"`
+	HashedPassword string `db:"hashed_password" json:"hashedPassword"`
+	Name           string `db:"name" json:"name"`
+	Surname        string `db:"surname" json:"surname"`
+}
+
+func (q *Queries) Create(ctx context.Context, arg CreateParams) error {
+	_, err := q.db.ExecContext(ctx, create,
+		arg.Email,
+		arg.HashedPassword,
+		arg.Name,
+		arg.Surname,
+	)
+	return err
+}

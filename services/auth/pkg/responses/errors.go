@@ -18,3 +18,4 @@ func AbortWithStatusJSONValidationErrors(c *gin.Context, code int, err error) {
     c.AbortWithStatusJSON(code , gin.H{
 		"errors": validatorTranslations.StringfyJSONErrArr(errs)})
 }
+
