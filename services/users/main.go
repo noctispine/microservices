@@ -1,23 +1,23 @@
 package main
 
 import (
-	"database/sql"
 	"log"
+	"net"
 	"os"
 
 	"github.com/capstone-project-bunker/backend/services/users/cmd/cache"
 	dbPackage "github.com/capstone-project-bunker/backend/services/users/cmd/db"
-	userQ "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
+	userDB "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
 	"github.com/capstone-project-bunker/backend/services/users/internal/handlers"
 	"github.com/capstone-project-bunker/backend/services/users/pkg/constants/envKeys"
-	"github.com/gin-gonic/gin"
+	"github.com/capstone-project-bunker/backend/services/users/pkg/pb"
 	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 )
 
-var db *sql.DB
-var userHandler *handlers.UserHandler
 var rdb *redis.Client
+var queriesDB *userDB.Queries
 
 func init() {
 	var err error
@@ -32,24 +32,35 @@ func init() {
 		log.Fatal(err)
 	}
 
-	db = dbPackage.GetDatabase()
-	queriesDB := userQ.New(db)
+	db := dbPackage.GetDatabase()
+	queriesDB = userDB.New(db)
 	rdb = cache.NewRedisClient()
-
-	userHandler = handlers.NewUserHandler(queriesDB, rdb)
 }
 
 func main() {
-	r := gin.Default()
-	r.POST("/", userHandler.Register)
-	r.GET("/", userHandler.GetAll)
-	r.GET("/by-email", userHandler.GetByEmail)
-	r.DELETE("/by-email", userHandler.DeleteByEmail)
-	r.DELETE("/:id", userHandler.DeleteById)
-	r.PATCH("/:id", userHandler.ActivateUser)
+	listen, err := net.Listen("tcp", ":" + os.Getenv("PORT"))
 
-	defer db.Close()
+	if err != nil {
+		log.Fatalln("Failed to listening:", err)
+	}
+
+	service := handlers.NewUserService(queriesDB, rdb)
+
+	grpcServer := grpc.NewServer()
+
+	pb.RegisterUserServiceServer(grpcServer, service)
+
+	if err := grpcServer.Serve(listen); err != nil {
+		log.Fatalln("Failed to serve:", err)
+	}
+	
+	// r.POST("/", userHandler.Register)
+	// r.GET("/", userHandler.GetAll)
+	// r.GET("/by-email", userHandler.GetByEmail)
+	// r.DELETE("/by-email", userHandler.DeleteByEmail)
+	// r.DELETE("/:id", userHandler.DeleteById)
+	// r.PATCH("/:id", userHandler.ActivateUser)
+
+	// defer db.Close()
 	defer rdb.Close()
-	log.Fatal(r.Run(":" + os.Getenv("DEV_PORT")))
-
 }

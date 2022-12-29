@@ -5,7 +5,7 @@ sql:
     schema: "schema.sql"
     gen:
       go:
-        package: "userQ"
+        package: "userDB"
         json_tags_case_style: "camel"
         emit_json_tags: true
         emit_db_tags: true
