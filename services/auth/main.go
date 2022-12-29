@@ -3,17 +3,16 @@ package main
 import (
 	"database/sql"
 	"log"
+	"net"
 	"os"
 
-	"github.com/capstone-project-bunker/backend/services/auth/cmd/db"
-	userDB "github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
-	"github.com/capstone-project-bunker/backend/services/auth/internal/handlers"
-	"github.com/capstone-project-bunker/backend/services/auth/pkg/constants/envKeys"
-	"github.com/gin-gonic/gin"
+	"github.com/capstone-project-bunker/backend/services/users/cmd/db"
+	userDB "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
+	"github.com/capstone-project-bunker/backend/services/users/pkg/constants/envKeys"
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 )
 
-var authHandler *handlers.AuthHandler
 var postgresUserDB *sql.DB
 var userDBQueries *userDB.Queries
 
@@ -30,17 +29,25 @@ func init(){
 	
 	postgresUserDB = db.GetDatabase()
 	userDBQueries = userDB.New(postgresUserDB)
-	authHandler = handlers.NewAuthHandler(userDBQueries)
+	// authHandler = handlers.NewAuthHandler(userDBQueries)
 }
 
 func main(){
-	r := gin.Default()
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.Writer.WriteString("yoyoyo")
-	})
-	r.POST("/login", authHandler.Login)
-	r.POST("/validate", authHandler.Validate)
+	listen, err := net.Listen("tcp", ":" + os.Getenv("PORT"))
+
+	if err != nil {
+		log.Fatalln("Failed to listening:", err)
+	}
+
+	s := handlers.NewAuthService(userDBQueries)
+
+	grpcServer := grpc.NewServer()
+
+	authPB.RegisterAuthServiceServer(grpcServer, s)
+
+	if err := grpcServer.Serve(listen); err != nil {
+		log.Fatalln("Failed to serve:", err)
+	}
 	
 	defer postgresUserDB.Close()
-	log.Fatal(r.Run(":" + os.Getenv("DEV_PORT")))
 }
