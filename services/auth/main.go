@@ -6,9 +6,11 @@ import (
 	"net"
 	"os"
 
-	"github.com/capstone-project-bunker/backend/services/users/cmd/db"
-	userDB "github.com/capstone-project-bunker/backend/services/users/cmd/db/queries/user"
-	"github.com/capstone-project-bunker/backend/services/users/pkg/constants/envKeys"
+	"github.com/capstone-project-bunker/backend/services/auth/cmd/db"
+	userDB "github.com/capstone-project-bunker/backend/services/auth/cmd/db/users"
+	"github.com/capstone-project-bunker/backend/services/auth/internal/handlers"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/constants/envKeys"
+	"github.com/capstone-project-bunker/backend/services/auth/pkg/pb"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
@@ -43,7 +45,7 @@ func main(){
 
 	grpcServer := grpc.NewServer()
 
-	authPB.RegisterAuthServiceServer(grpcServer, s)
+	pb.RegisterAuthServiceServer(grpcServer, s)
 
 	if err := grpcServer.Serve(listen); err != nil {
 		log.Fatalln("Failed to serve:", err)
