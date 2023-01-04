@@ -5,6 +5,7 @@ import (
 
 	"github.com/capstone-project-bunker/backend/services/gateway/pkg/auth"
 	"github.com/capstone-project-bunker/backend/services/gateway/pkg/config"
+	"github.com/capstone-project-bunker/backend/services/gateway/pkg/middlewares"
 	"github.com/capstone-project-bunker/backend/services/gateway/pkg/users"
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +20,7 @@ func main() {
     }
 
     r := gin.Default()
+    r.Use(middlewares.CORSMiddleware())
 
     authSvc := auth.RegisterRoutes(r, &config)
     users.RegisterRoutes(r, &config, authSvc)
