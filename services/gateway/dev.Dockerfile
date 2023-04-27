@@ -2,13 +2,13 @@ FROM golang:1.19-alpine
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
+COPY ../shared ./shared
+COPY ../gateway ./service
 
-COPY  . .
+RUN cd /app/service && go mod download
+RUN cd /app/shared && go mod download
 
-RUN ["go", "get", "github.com/githubnemo/CompileDaemon"]
-RUN ["go", "install", "github.com/githubnemo/CompileDaemon"]
+RUN cd /app/service && go get github.com/githubnemo/CompileDaemon
+RUN cd /app/service && go install github.com/githubnemo/CompileDaemon
 
-ENTRYPOINT CompileDaemon -polling -log-prefix=false -build="go build -o ./build/gateway" -command="./build/gateway APP_ENV=DEVELOPMENT" -directory="./"
+ENTRYPOINT cd /app/service && CompileDaemon -polling -log-prefix=false -build="go build -o ./build/gateway" -command="./build/gateway APP_ENV=DEVELOPMENT" -directory="./"
