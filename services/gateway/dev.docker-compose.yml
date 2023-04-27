@@ -5,11 +5,13 @@ services:
         container_name: gateway
         restart: always
         build:
-          dockerfile: dev.Dockerfile
+          context: ../
+          dockerfile: ./gateway/dev.Dockerfile
         ports:
             - 3000:8082
         volumes:
-            - ./:/app
+            - ./:/app/service
+            - ../shared/:/app/shared
             
 networks:
   default:
