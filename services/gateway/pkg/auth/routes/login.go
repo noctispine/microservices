@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/capstone-project-bunker/backend/services/gateway/pkg/auth/pb"
 	"github.com/capstone-project-bunker/backend/services/gateway/pkg/responses"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/metadata"
 )
 
 type LoginRequestBody struct {
@@ -28,7 +30,9 @@ func Login(c *gin.Context, client pb.AuthServiceClient) {
 		return
 	}
 
-	res, err := client.Login(c, &pb.LoginRequest{
+
+	ctx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("X-Correlation-Id", c.GetHeader("X-Correlation-Id")))
+	res, err := client.Login(ctx, &pb.LoginRequest{
 		Email: body.Email,
 		Password: body.Password,
 	})
@@ -44,10 +48,12 @@ func Login(c *gin.Context, client pb.AuthServiceClient) {
 		return
 	}
 
-
+	
 	c.JSON(http.StatusOK, gin.H{
 		"token": res.Token,
 		"id": res.Id,
 		"role": res.Role,
+		"name": res.Name,
+		"surname": res.Surname,
 	})
 }

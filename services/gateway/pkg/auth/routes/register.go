@@ -22,7 +22,6 @@ func Register(c *gin.Context, client pb.AuthServiceClient) {
 
 	if err := c.ShouldBindJSON(&registerRequestBody); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
-		// log.Error(err)
 		return
 	}
 
