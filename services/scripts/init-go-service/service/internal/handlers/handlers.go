@@ -15,7 +15,7 @@ import (
 type $serviceNameCapitalizedService struct {
 	pb.Unimplemented$serviceNameCapitalizedServiceServer
 }
-func New$() *$serviceNameCapitalizedService {
+func New$serviceNameCapitalizedService() *$serviceNameCapitalizedService {
 	return &$serviceNameCapitalizedService{}
 
 }

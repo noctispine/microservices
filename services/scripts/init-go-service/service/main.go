@@ -13,7 +13,7 @@ func init(){
     var err error
     config.Conf, err = config.LoadConfig()
     if err != nil {
-        utils.Logger.Sugar().Fatal("failed at config %w", err)
+        cutils.Logger.Sugar().Fatal("failed at config %w", err)
     }
 }
 
@@ -29,19 +29,14 @@ func main() {
 
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(UnaryInterceptor))
 
-	pb.RegisterAuthServiceServer(grpcServer, s)
+	pb.Register$serviceNameCapitalizedServiceServer(grpcServer, s)
 
 	if err := grpcServer.Serve(listen); err != nil {
 		log.Fatalln("Failed to serve:", err)
 	}
-	
-	defer postgresUserDB.Close()
-    
-    r := gin.Default()
-    r.Use(middlewares.CORSMiddleware(), middlewares.AddCorelationID())
 
-    authSvc := auth.RegisterRoutes(r, &config.Conf)
-    users.RegisterRoutes(r, &config.Conf, authSvc)
+	// defer postgresUserDB.Close()
 
-    r.Run(config.Conf.Port)
+
+    r.Run(config.Conf.PORT)
 }

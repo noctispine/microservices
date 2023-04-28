@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/capstone-project-bunker/backend/services/auth/internal/validatorTranslations"
+	"github.com/capstone-project-bunker/backend/services/$serviceName/internal/validatorTranslations"
 	"github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
