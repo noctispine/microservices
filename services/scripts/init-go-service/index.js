@@ -1,8 +1,10 @@
 const { Command } = require("commander")
 const figlet = require("figlet")
 const { create } = require("./commands/create")
+const chalk = require("chalk")
 
-console.log(figlet.textSync("capstone - mc"))
+console.log(chalk.red(figlet.textSync("capstone - mc")))
+console.log('\n')
 
 const program = new Command();
 
@@ -13,15 +15,9 @@ program
 
 program
   .command('create')
-  .argument('<projectName>')
-  .argument('<port>')
+  .description('create go microservice')
   .action(() => {
     create(program)
   })
 
 program.parse();
-
-
-
-
-

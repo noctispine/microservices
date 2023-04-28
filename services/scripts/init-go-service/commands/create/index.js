@@ -1,11 +1,20 @@
 const fs = require("fs")
 const path = require("path")
+const inquirer = require('inquirer')
 const chalk = require("chalk")
 const { getAllFiles } = require("./helper")
+const { questions } = require('./constants')
 
 async function create(program) {
-    const projectName = program.args[1]
-    const port = program.args[2]
+    prompt = inquirer.createPromptModule()
+    let answers
+
+    await prompt(questions).then(inputs => {
+        answers = { ...inputs }
+    })
+
+    const { projectName, port } = answers
+    
     copyProject(`./${projectName}`)
     const files = getAllFiles(`./${projectName}`)
     console.log(files)
@@ -30,11 +39,9 @@ async function create(program) {
             })
 
         })
-
-
     })
-    console.log(chalk.yellow(projectName) + chalk.cyan(" service is created"))
 
+    console.log(chalk.yellow(projectName) + chalk.cyan(" service is created"))
 }
 
 function copyProject(dest) {
