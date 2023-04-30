@@ -18,5 +18,19 @@ function getAllFiles(dirPath, arrayOfFiles) {
 }
 
 
+function constructFileDirs(projectName) {
+    return [
+        {
+            src: './scripts/go-service/files/service',
+            dest: `./${projectName}`
+        },
+        {
+            src: './scripts/go-service/files/example.proto',
+            dest: `./proto-buffers/${projectName}.proto`
+        }
+    ]
+}
 
-module.exports = { getAllFiles }
+
+
+module.exports = { getAllFiles, constructFileDirs }

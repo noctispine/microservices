@@ -2,7 +2,7 @@ const fs = require("fs")
 const path = require("path")
 const inquirer = require('inquirer')
 const chalk = require("chalk")
-const { getAllFiles } = require("./helper")
+const { getAllFiles, constructFileDirs } = require("./helper")
 const { questions } = require('./constants')
 
 async function create(program) {
@@ -15,14 +15,16 @@ async function create(program) {
 
     const { projectName, port } = answers
     
-    copyProject(`./${projectName}`)
+    copyProject(projectName)
     const files = getAllFiles(`./${projectName}`)
+    files.push(`./proto-buffers/${projectName}.proto`)
+    
     console.log(files)
 
     files.forEach(file => {
         fs.readFile(file, 'utf-8', (err, data) => {
             if(err) {
-                console.error("error occured while writing to file", err)
+                console.error("error occured while reading a file", err)
                 process.exit(1)
             }
 
@@ -44,10 +46,13 @@ async function create(program) {
     console.log(chalk.yellow(projectName) + chalk.cyan(" service is created"))
 }
 
-function copyProject(dest) {
-    fs.cpSync('./scripts/init-go-service/service', dest, {recursive: true}, (err) => {
-        console.error("service cannot copied to destination")
-        process.exitCode(2)
+function copyProject(projectName) {
+    const fileDirs = constructFileDirs(projectName)
+    fileDirs.forEach(fileDir => {
+        fs.cpSync(fileDir.src, fileDir.dest, {recursive: true}, (err) => {
+            console.error(`${path.basename(fileDir.src)} cannot copied to destination`, err)
+            process.exitCode(2)
+        })
     })
 }
 
