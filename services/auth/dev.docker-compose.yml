@@ -5,11 +5,22 @@ services:
         container_name: auth_go
         restart: always
         build:
-          dockerfile: dev.Dockerfile
+          context: ../
+          dockerfile: ./auth/dev.Dockerfile
         ports:
             - 50000:8080
         volumes:
-            - ./:/app
+            - ./:/app/service
+            - ../shared/:/app/shared
+    
+    filebeat:
+      container_name: auth-filebeat
+      user: root
+      image: docker.elastic.co/beats/filebeat:7.14.0
+      command: filebeat -e -strict.perms=false
+      volumes:
+        - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+        - ./logs/:/logs/
             
 networks:
   default:
