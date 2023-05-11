@@ -1,0 +1,46 @@
+version: "3.8"
+services:
+  elasticsearch:
+    container_name: elasticsearch
+    labels:
+      co.elastic.logs/enabled: false
+    environment: 
+      - discovery.type=single-node
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f","http://localhost:9200/_cat/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 80
+    ports:
+      - 9200:9200
+
+  kibana:
+    container_name: kibana
+    labels:
+      co.elastic.logs/enabled: false
+    image: docker.elastic.co/kibana/kibana:7.14.0
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/api/status"]
+      interval: 3s
+      timeout: 3s
+      retries: 80
+    ports:
+      - 5601:5601
+
+  logstash:
+    container_name: logstash
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    volumes:
+        - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+        elasticsearch:
+            condition: service_healthy
+
+networks:
+  default:
+    name: cp-backend 
+    external: true
