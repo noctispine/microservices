@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package base;
+
+option go_package = "baseProto/";
+
+message Response {
+    int64 status = 1;
+    string error = 2;
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package users;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "pb/";
+
+
+service UserService {
+  rpc GetAll(GetAllRequest) returns (GetAllResponse) {}
+  rpc GetById(GetByIdRequest) returns (GetByIdResponse) {}
+  rpc DeleteById(DeleteByIdRequest) returns (DeleteByIdResponse) {}
+  rpc Register(RegisterRequest) returns (RegisterResponse) {}
+  rpc ActivateUser(ActivateUserRequest) returns (ActivateUserResponse) {}
+
+}
+
+message Response {
+    int32 status = 1;
+    string error = 2;
+}
+
+enum ROLES {
+  ADMIN = 0;
+  USER = 1;
+}
+
+message User {
+    string id = 1;
+    string email = 2;
+    string name = 3;
+    string surname = 4;
+    ROLES role = 5;
+    google.protobuf.Timestamp createdAt = 6;
+    google.protobuf.Timestamp lastLoginAt = 7;
+    bool isActive = 8;
+}
+
+message GetAllRequest {}
+
+message GetAllResponse {
+  Response baseResponse = 1;
+  repeated User users = 2;
+}
+
+message GetByIdRequest {
+    string id = 1;
+}
+
+message GetByIdResponse {
+  Response baseResponse = 1;
+  User user = 2;
+}
+
+message DeleteByIdRequest {
+  string id = 1;
+}
+
+message DeleteByIdResponse {
+  Response baseResponse = 1;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string name = 3;
+  string surname = 4;
+}
+
+message RegisterResponse {
+  Response baseResponse = 1;
+}
+
+message ActivateUserRequest {
+  string id = 1;
+}
+
+message ActivateUserResponse {
+  Response baseResponse = 1;
+}

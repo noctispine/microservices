@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+    gateway:
+        container_name: gateway
+        restart: always
+        build:
+          context: ../
+          dockerfile: ./gateway/dev.Dockerfile
+        ports:
+            - 3000:8082
+        volumes:
+            - ./:/app/service
+            - ../shared/:/app/shared
+    filebeat:
+      container_name: gateway-filebeat
+      user: root
+      image: docker.elastic.co/beats/filebeat:7.14.0
+      command: filebeat -e -strict.perms=false
+      volumes:
+        - ./fbconfig.yml:/usr/share/filebeat/filebeat.yml
+        - ./logs/:/logs/
+            
+networks:
+  default:
+    name: cp-backend 
+    external: true

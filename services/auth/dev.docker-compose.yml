@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+    auth_service:
+        container_name: auth_go
+        restart: always
+        build:
+          context: ../
+          dockerfile: ./auth/dev.Dockerfile
+        ports:
+            - 50000:8080
+        volumes:
+            - ./:/app/service
+            - ../shared/:/app/shared
+    
+    filebeat:
+      container_name: auth-filebeat
+      user: root
+      image: docker.elastic.co/beats/filebeat:7.14.0
+      command: filebeat -e -strict.perms=false
+      volumes:
+        - ./filebeat.yml:/usr/share/filebeat/filebeat.yml
+        - ./logs/:/logs/
+            
+networks:
+  default:
+    name: cp-backend 
+    external: true
